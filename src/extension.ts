@@ -144,8 +144,8 @@ export const activate = (context: vscode.ExtensionContext) => {
             const date = new Date(dateStr);
             date.setHours(0, 0, 0, 0); // 時刻部分をリセット
             
-            const startPos = editor.document.positionAt(match.index);
-            const endPos = editor.document.positionAt(match.index + match[0].length);
+            const startPos = editor.document.positionAt(match.index - 1);
+            const endPos = editor.document.positionAt(match.index + match[0].length + 1);
             
             // 日付の前後関係に応じて開始日と終了日を設定
             const [start, end] = date < today ? [date, today] : [today, date];
