@@ -1,6 +1,6 @@
 // src/extension.ts
 import * as vscode from 'vscode';
-import { isWeekend, eachDayOfInterval, differenceInDays } from 'date-fns';
+import { isWeekend, eachDayOfInterval, differenceInDays, isValid, parse } from 'date-fns';
 
 // フィボナッチ数列の境界値を定義
 const FIBONACCI_BOUNDARIES = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89];
@@ -72,8 +72,8 @@ export const activate = (context: vscode.ExtensionContext) => {
             return BLUE_HUE;
         } else {
             // フィボナッチ数列の境界値に基づいて色相を計算
-            const index = FIBONACCI_BOUNDARIES.indexOf(fibonacciCategory);
-            const maxIndex = FIBONACCI_BOUNDARIES.length - 1;
+            const index = FIBONACCI_BOUNDARIES.indexOf(fibonacciCategory) + 1;
+            const maxIndex = FIBONACCI_BOUNDARIES.length;
             const ratio = index / maxIndex;
             
             // 色相を0から240の間で補間（赤から青へ）
@@ -102,8 +102,15 @@ export const activate = (context: vscode.ExtensionContext) => {
 
     // 土日を除く日数を計算する関数
     const calculateBusinessDays = (startDate: Date, endDate: Date): number => {
+        if (startDate.getTime() === endDate.getTime()) return 0;
         const days = eachDayOfInterval({ start: startDate, end: endDate });
         return days.filter(day => !isWeekend(day)).length;
+    };
+
+    // 日付の妥当性をチェックする関数
+    const isValidDate = (dateStr: string): boolean => {
+        const parsedDate = parse(dateStr, 'yyyy-MM-dd', new Date());
+        return isValid(parsedDate);
     };
 
     // ハイライトを更新する関数
@@ -116,8 +123,8 @@ export const activate = (context: vscode.ExtensionContext) => {
         const editor = activeEditor;
         const text = editor.document.getText();
         
-        // yyyy-MM-dd 形式の正規表現 (単語境界 \b を追加して、2023-01-01-extra のようなものを避ける)
-        const dateRegex = /\b\d{4}-\d{2}-\d{2}\b/g;
+        // yyyy-MM-dd 形式の正規表現 (前後に空白文字があることを確認)
+        const dateRegex = /(?<=\s|^)\d{4}-\d{2}-\d{2}(?=\s|$)/g;
         
         // 日付ごとのデコレーション情報を保持するマップ
         const decorationsMap: Map<number, vscode.DecorationOptions[]> = new Map();
@@ -128,6 +135,12 @@ export const activate = (context: vscode.ExtensionContext) => {
         
         while ((match = dateRegex.exec(text))) {
             const dateStr = match[0];
+            
+            // 日付の妥当性をチェック
+            if (!isValidDate(dateStr)) {
+                continue; // 不正な日付はスキップ
+            }
+            
             const date = new Date(dateStr);
             date.setHours(0, 0, 0, 0); // 時刻部分をリセット
             
