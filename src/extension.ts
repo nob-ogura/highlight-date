@@ -1,10 +1,21 @@
 // src/extension.ts
 import * as vscode from 'vscode';
+import { isWeekend, eachDayOfInterval, differenceInDays } from 'date-fns';
+
+// フィボナッチ数列の境界値を定義
+const FIBONACCI_BOUNDARIES = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89];
+const MAX_FIBONACCI_NUMBER = FIBONACCI_BOUNDARIES[FIBONACCI_BOUNDARIES.length - 1];
+
+// 文字色
+const TEXT_COLOR = 'black';
+const MAX_HUE = 210;
+const RED_HUE = 'hsl(0, 100%, 50%)'
+const BLUE_HUE = `hsl(${MAX_HUE}, 100%, 50%)`
 
 // 過去の日付用デコレーションタイプ
 const pastDateDecorationType = vscode.window.createTextEditorDecorationType({
-    backgroundColor: 'rgb(255, 0, 0)', // 赤
-    color: 'white',
+    backgroundColor: RED_HUE,
+    color: TEXT_COLOR,
 });
 
 // 将来の日付用のデコレーションタイプを保持するマップ
@@ -37,39 +48,63 @@ export const activate = (context: vscode.ExtensionContext) => {
 
     let activeEditor = vscode.window.activeTextEditor;
 
-    // 日数差に基づいて色を計算する関数
-    const calculateColor = (diffDays: number): string => {
+    // 日数差をフィボナッチ数列の境界値に基づいて分類する関数
+    const getFibonacciCategory = (diffDays: number): number => {
         if (diffDays <= 0) {
+            return 0; // 過去または今日
+        }
+        if (diffDays > MAX_FIBONACCI_NUMBER) {
+            return MAX_FIBONACCI_NUMBER; // 最大日数以上先の未来
+        }
+        
+        // フィボナッチ数列の境界値の中で、diffDaysを超えない最大の値を返す
+        const category = [...FIBONACCI_BOUNDARIES].reverse().find(boundary => diffDays >= boundary);
+        return category ?? 1; // 1日未満の場合は1として扱う
+    }
+
+    // 日数差に基づいて色を計算する関数
+    const calculateColor = (fibonacciCategory: number): string => {
+        if (fibonacciCategory <= 0) {
             // 過去または今日
-            return 'rgb(255, 0, 0)';
-        } else if (diffDays >= 50) {
-            // 50日以上先の未来
-            return 'rgb(0, 0, 255)';
+            return RED_HUE;
+        } else if (fibonacciCategory >= FIBONACCI_BOUNDARIES[FIBONACCI_BOUNDARIES.length - 1]) {
+            // 最大日数以上先の未来
+            return BLUE_HUE;
         } else {
-            // 1〜49日後: 徐々に赤から青へ (RGB値が3ずつ変化)
-            const redValue = Math.max(0, 255 - (diffDays * 3 * 255 / 50));
-            const blueValue = Math.min(255, (diffDays * 3 * 255 / 50));
-            return `rgb(${Math.round(redValue)}, 0, ${Math.round(blueValue)})`;
+            // フィボナッチ数列の境界値に基づいて色相を計算
+            const index = FIBONACCI_BOUNDARIES.indexOf(fibonacciCategory);
+            const maxIndex = FIBONACCI_BOUNDARIES.length - 1;
+            const ratio = index / maxIndex;
+            
+            // 色相を0から240の間で補間（赤から青へ）
+            const hue = Math.round(ratio * MAX_HUE);
+            return `hsl(${hue}, 100%, 50%)`;
         }
     }
 
     // 日数差に基づいたデコレーションタイプを取得する関数
-    const getOrCreateDecorationType = (diffDays: number): vscode.TextEditorDecorationType => {
-        if (diffDays <= 0) {
+    const getOrCreateDecorationType = (fibonacciCategory: number): vscode.TextEditorDecorationType => {
+        if (fibonacciCategory <= 0) {
             return pastDateDecorationType;
         }
         
-        if (!futureDecorationTypes.has(diffDays)) {
+        if (!futureDecorationTypes.has(fibonacciCategory)) {
             const decorationType = vscode.window.createTextEditorDecorationType({
-                backgroundColor: calculateColor(diffDays),
-                color: 'white',
+                backgroundColor: calculateColor(fibonacciCategory),
+                color: TEXT_COLOR,
             });
-            futureDecorationTypes.set(diffDays, decorationType);
+            futureDecorationTypes.set(fibonacciCategory, decorationType);
             context.subscriptions.push(decorationType);
         }
         
-        return futureDecorationTypes.get(diffDays)!;
+        return futureDecorationTypes.get(fibonacciCategory)!;
     }
+
+    // 土日を除く日数を計算する関数
+    const calculateBusinessDays = (startDate: Date, endDate: Date): number => {
+        const days = eachDayOfInterval({ start: startDate, end: endDate });
+        return days.filter(day => !isWeekend(day)).length;
+    };
 
     // ハイライトを更新する関数
     const updateDecorations = () => {
@@ -94,22 +129,28 @@ export const activate = (context: vscode.ExtensionContext) => {
         while ((match = dateRegex.exec(text))) {
             const dateStr = match[0];
             const date = new Date(dateStr);
+            date.setHours(0, 0, 0, 0); // 時刻部分をリセット
             
             const startPos = editor.document.positionAt(match.index);
             const endPos = editor.document.positionAt(match.index + match[0].length);
             
-            const diffTime = date.getTime() - today.getTime();
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            // 日付の前後関係に応じて開始日と終了日を設定
+            const [start, end] = date < today ? [date, today] : [today, date];
+            const diffDays = calculateBusinessDays(start, end);
+            // 過去の日付の場合は負の値にする
+            const signedDiffDays = date < today ? -diffDays : diffDays;
+            
+            const fibonacciCategory = getFibonacciCategory(signedDiffDays);
             
             const decoration = {
                 range: new vscode.Range(startPos, endPos),
             };
             
-            // 日数差ごとにデコレーションを分類
-            if (!decorationsMap.has(diffDays)) {
-                decorationsMap.set(diffDays, []);
+            // フィボナッチカテゴリごとにデコレーションを分類
+            if (!decorationsMap.has(fibonacciCategory)) {
+                decorationsMap.set(fibonacciCategory, []);
             }
-            decorationsMap.get(diffDays)!.push(decoration);
+            decorationsMap.get(fibonacciCategory)!.push(decoration);
         }
 
         // 現在のエディタの全てのデコレーションをクリア
@@ -118,9 +159,9 @@ export const activate = (context: vscode.ExtensionContext) => {
             editor.setDecorations(decType, []);
         });
 
-        // 日数差ごとに適切なデコレーションを適用
-        decorationsMap.forEach((decorations, diffDays) => {
-            const decorationType = getOrCreateDecorationType(diffDays);
+        // フィボナッチカテゴリごとに適切なデコレーションを適用
+        decorationsMap.forEach((decorations, fibonacciCategory) => {
+            const decorationType = getOrCreateDecorationType(fibonacciCategory);
             editor.setDecorations(decorationType, decorations);
         });
     }
