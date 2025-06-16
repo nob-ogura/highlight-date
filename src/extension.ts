@@ -7,10 +7,10 @@ const FIBONACCI_BOUNDARIES = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89];
 const MAX_FIBONACCI_NUMBER = FIBONACCI_BOUNDARIES[FIBONACCI_BOUNDARIES.length - 1];
 
 // 文字色
-const TEXT_COLOR = 'black';
+const TEXT_COLOR = 'white';
 const MAX_HUE = 210;
-const RED_HUE = 'hsl(0, 100%, 50%)'
-const BLUE_HUE = `hsl(${MAX_HUE}, 100%, 50%)`
+const RED_HUE = 'hsl(0, 100%, 40%)'
+const BLUE_HUE = `hsl(${MAX_HUE}, 100%, 40%)`
 
 // 過去の日付用デコレーションタイプ
 const pastDateDecorationType = vscode.window.createTextEditorDecorationType({
@@ -78,7 +78,7 @@ export const activate = (context: vscode.ExtensionContext) => {
             
             // 色相を0から240の間で補間（赤から青へ）
             const hue = Math.round(ratio * MAX_HUE);
-            return `hsl(${hue}, 100%, 50%)`;
+            return `hsl(${hue}, 100%, 40%)`;
         }
     }
 
