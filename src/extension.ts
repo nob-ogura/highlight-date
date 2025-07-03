@@ -9,7 +9,7 @@ const MAX_FIBONACCI_NUMBER = FIBONACCI_BOUNDARIES[FIBONACCI_BOUNDARIES.length - 
 // 文字色
 const TEXT_COLOR = 'white';
 const MAX_HUE = 210;
-const BASE_LIGHTNESS = 30;
+const BASE_LIGHTNESS = 40;
 const SUBTRACT_LIGHTNESS = 10;
 const RED_HUE = `hsl(0, 100%, ${BASE_LIGHTNESS}%)`
 const BLUE_HUE = `hsl(${MAX_HUE}, 100%, ${BASE_LIGHTNESS - SUBTRACT_LIGHTNESS}%)`
@@ -58,7 +58,7 @@ export const activate = (context: vscode.ExtensionContext) => {
         if (diffDays > MAX_FIBONACCI_NUMBER) {
             return MAX_FIBONACCI_NUMBER; // 最大日数以上先の未来
         }
-        
+
         // フィボナッチ数列の境界値の中で、diffDaysを超えない最大の値を返す
         const category = [...FIBONACCI_BOUNDARIES].reverse().find(boundary => diffDays >= boundary);
         return category ?? 1; // 1日未満の場合は1として扱う
@@ -77,7 +77,7 @@ export const activate = (context: vscode.ExtensionContext) => {
             const index = FIBONACCI_BOUNDARIES.indexOf(fibonacciCategory) + 1;
             const maxIndex = FIBONACCI_BOUNDARIES.length;
             const ratio = index / maxIndex;
-            
+
             // 色相を0から240の間で補間（赤から青へ）
             const hue = Math.round(ratio * MAX_HUE);
             const lightness = Math.round(BASE_LIGHTNESS - ratio * SUBTRACT_LIGHTNESS);
@@ -90,7 +90,7 @@ export const activate = (context: vscode.ExtensionContext) => {
         if (fibonacciCategory <= 0) {
             return pastDateDecorationType;
         }
-        
+
         if (!futureDecorationTypes.has(fibonacciCategory)) {
             const decorationType = vscode.window.createTextEditorDecorationType({
                 backgroundColor: calculateColor(fibonacciCategory),
@@ -99,7 +99,7 @@ export const activate = (context: vscode.ExtensionContext) => {
             futureDecorationTypes.set(fibonacciCategory, decorationType);
             context.subscriptions.push(decorationType);
         }
-        
+
         return futureDecorationTypes.get(fibonacciCategory)!;
     }
 
@@ -121,47 +121,47 @@ export const activate = (context: vscode.ExtensionContext) => {
         if (!activeEditor) {
             return;
         }
-        
+
         // ローカル変数に代入して型を明確にする
         const editor = activeEditor;
         const text = editor.document.getText();
-        
+
         // yyyy-MM-dd 形式の正規表現 (前後に空白文字があることを確認)
         const dateRegex = /(?<=\s|^)\d{4}-\d{2}-\d{2}(?=\s|$)/g;
-        
+
         // 日付ごとのデコレーション情報を保持するマップ
         const decorationsMap: Map<number, vscode.DecorationOptions[]> = new Map();
-        
+
         let match;
         const today = new Date();
         today.setHours(0, 0, 0, 0); // 時刻部分をリセット
-        
+
         while ((match = dateRegex.exec(text))) {
             const dateStr = match[0];
-            
+
             // 日付の妥当性をチェック
             if (!isValidDate(dateStr)) {
                 continue; // 不正な日付はスキップ
             }
-            
+
             const date = new Date(dateStr);
             date.setHours(0, 0, 0, 0); // 時刻部分をリセット
-            
+
             const startPos = editor.document.positionAt(match.index - 1);
             const endPos = editor.document.positionAt(match.index + match[0].length + 1);
-            
+
             // 日付の前後関係に応じて開始日と終了日を設定
             const [start, end] = date < today ? [date, today] : [today, date];
             const diffDays = calculateBusinessDays(start, end);
             // 過去の日付の場合は負の値にする
             const signedDiffDays = date < today ? -diffDays : diffDays;
-            
+
             const fibonacciCategory = getFibonacciCategory(signedDiffDays);
-            
+
             const decoration = {
                 range: new vscode.Range(startPos, endPos),
             };
-            
+
             // フィボナッチカテゴリごとにデコレーションを分類
             if (!decorationsMap.has(fibonacciCategory)) {
                 decorationsMap.set(fibonacciCategory, []);
