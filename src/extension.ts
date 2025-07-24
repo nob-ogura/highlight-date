@@ -1,6 +1,6 @@
 // src/extension.ts
+import { eachDayOfInterval, isValid, isWeekend, parse } from 'date-fns';
 import * as vscode from 'vscode';
-import { isWeekend, eachDayOfInterval, differenceInDays, isValid, parse } from 'date-fns';
 
 // フィボナッチ数列の境界値を定義
 const FIBONACCI_BOUNDARIES = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89];
@@ -26,7 +26,7 @@ const futureDecorationTypes: Map<number, vscode.TextEditorDecorationType> = new 
 // 拡張機能がアクティブになったときに呼ばれる関数
 export const activate = (context: vscode.ExtensionContext) => {
     // updateDecorationsを頻繁に呼びすぎないようにするためのスロットリング
-    let timeout: NodeJS.Timeout | undefined = undefined;
+    let timeout: NodeJS.Timeout | undefined;
     const triggerUpdateDecorations = (throttle: boolean = true) => {
         if (timeout) {
             clearTimeout(timeout);
@@ -91,8 +91,9 @@ export const activate = (context: vscode.ExtensionContext) => {
             return pastDateDecorationType;
         }
 
-        if (!futureDecorationTypes.has(fibonacciCategory)) {
-            const decorationType = vscode.window.createTextEditorDecorationType({
+        let decorationType = futureDecorationTypes.get(fibonacciCategory);
+        if (!decorationType) {
+            decorationType = vscode.window.createTextEditorDecorationType({
                 backgroundColor: calculateColor(fibonacciCategory),
                 color: TEXT_COLOR,
             });
@@ -100,7 +101,7 @@ export const activate = (context: vscode.ExtensionContext) => {
             context.subscriptions.push(decorationType);
         }
 
-        return futureDecorationTypes.get(fibonacciCategory)!;
+        return decorationType;
     }
 
     // 土日を除く日数を計算する関数
@@ -132,15 +133,14 @@ export const activate = (context: vscode.ExtensionContext) => {
         // 日付ごとのデコレーション情報を保持するマップ
         const decorationsMap: Map<number, vscode.DecorationOptions[]> = new Map();
 
-        let match;
         const today = new Date();
         today.setHours(0, 0, 0, 0); // 時刻部分をリセット
 
-        while ((match = dateRegex.exec(text))) {
+        for (const match of text.matchAll(dateRegex)) {
             const dateStr = match[0];
 
             // 日付の妥当性をチェック
-            if (!isValidDate(dateStr)) {
+            if (!isValidDate(dateStr) || match.index === undefined) {
                 continue; // 不正な日付はスキップ
             }
 
@@ -163,10 +163,12 @@ export const activate = (context: vscode.ExtensionContext) => {
             };
 
             // フィボナッチカテゴリごとにデコレーションを分類
-            if (!decorationsMap.has(fibonacciCategory)) {
-                decorationsMap.set(fibonacciCategory, []);
+            const decorations = decorationsMap.get(fibonacciCategory);
+            if (decorations) {
+                decorations.push(decoration);
+            } else {
+                decorationsMap.set(fibonacciCategory, [decoration]);
             }
-            decorationsMap.get(fibonacciCategory)!.push(decoration);
         }
 
         // 現在のエディタの全てのデコレーションをクリア
