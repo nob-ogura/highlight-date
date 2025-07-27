@@ -6,21 +6,13 @@ import * as vscode from 'vscode';
 const FIBONACCI_BOUNDARIES = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89];
 const MAX_FIBONACCI_NUMBER = FIBONACCI_BOUNDARIES[FIBONACCI_BOUNDARIES.length - 1];
 
-// 文字色・背景色
+// 文字色
 const TEXT_COLOR = 'white';
 const MAX_HUE = 210;
 const BASE_LIGHTNESS = 40;
 const SUBTRACT_LIGHTNESS = 10;
 const RED_HUE = `hsl(0, 100%, ${BASE_LIGHTNESS}%)`
 const BLUE_HUE = `hsl(${MAX_HUE}, 100%, ${BASE_LIGHTNESS - SUBTRACT_LIGHTNESS}%)`
-const CHECKED_TEXT_COLOR = 'black';
-const CHECKED_BACKGROUND_COLOR = `gray`;
-
-// `- [x]` で始まる行用のデコレーションタイプ
-const checkedDecorationType = vscode.window.createTextEditorDecorationType({
-    backgroundColor: CHECKED_BACKGROUND_COLOR,
-    color: CHECKED_TEXT_COLOR,
-});
 
 // 過去の日付用デコレーションタイプ
 const pastDateDecorationType = vscode.window.createTextEditorDecorationType({
@@ -137,12 +129,9 @@ export const activate = (context: vscode.ExtensionContext) => {
 
         // yyyy-MM-dd 形式の正規表現 (前後に空白文字があることを確認)
         const dateRegex = /(?<=\s|^)\d{4}-\d{2}-\d{2}(?=\s|$)/g;
-        const checkedRegex = /- \[x\].*$/gm;
-
 
         // 日付ごとのデコレーション情報を保持するマップ
         const decorationsMap: Map<number, vscode.DecorationOptions[]> = new Map();
-        const checkedDecorations: vscode.DecorationOptions[] = [];
 
         const today = new Date();
         today.setHours(0, 0, 0, 0); // 時刻部分をリセット
@@ -182,33 +171,17 @@ export const activate = (context: vscode.ExtensionContext) => {
             }
         }
 
-        for (const match of text.matchAll(checkedRegex)) {
-            if (match.index === undefined) {
-                continue;
-            }
-            const startPos = editor.document.positionAt(match.index);
-            const endPos = editor.document.positionAt(match.index + match[0].length);
-
-            const decoration = {
-                range: new vscode.Range(startPos, endPos),
-            };
-            checkedDecorations.push(decoration);
-        }
-
         // 現在のエディタの全てのデコレーションをクリア
         editor.setDecorations(pastDateDecorationType, []);
         futureDecorationTypes.forEach(decType => {
             editor.setDecorations(decType, []);
         });
-        editor.setDecorations(checkedDecorationType, []);
 
         // フィボナッチカテゴリごとに適切なデコレーションを適用
         decorationsMap.forEach((decorations, fibonacciCategory) => {
             const decorationType = getOrCreateDecorationType(fibonacciCategory);
             editor.setDecorations(decorationType, decorations);
         });
-
-        editor.setDecorations(checkedDecorationType, checkedDecorations);
     }
 
     // 初回起動時、またはウィンドウリロード時にアクティブエディタがあれば実行
@@ -241,5 +214,4 @@ export const deactivate = () => {
         decorationType.dispose();
     });
     futureDecorationTypes.clear();
-    checkedDecorationType.dispose();
 }
