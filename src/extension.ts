@@ -3,7 +3,7 @@ import { eachDayOfInterval, isValid, isWeekend, parse } from 'date-fns';
 import * as vscode from 'vscode';
 
 // フィボナッチ数列の境界値を定義
-const FIBONACCI_BOUNDARIES = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89];
+const FIBONACCI_BOUNDARIES = [2, 3, 5, 8, 13, 21, 34, 55, 89];
 const MAX_FIBONACCI_NUMBER = FIBONACCI_BOUNDARIES[FIBONACCI_BOUNDARIES.length - 1];
 
 // 文字色
